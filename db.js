@@ -16,6 +16,7 @@ db.exec(`
     birth_place   TEXT    NOT NULL,
     citizenship   TEXT    NOT NULL,
     address       TEXT    NOT NULL DEFAULT '',
+    specialty     TEXT    NOT NULL DEFAULT '',
     phone         TEXT    NOT NULL UNIQUE,
     consent       INTEGER NOT NULL DEFAULT 0,
     admin_comment TEXT    NOT NULL DEFAULT '',
@@ -42,10 +43,13 @@ db.exec(`
   );
 `);
 
-// --- Безопасная миграция для уже существующих баз (добавляем колонку address) ---
+// --- Безопасная миграция для уже существующих баз (добавляем новые колонки) ---
 const cols = db.prepare(`PRAGMA table_info(users)`).all();
 if (!cols.some((c) => c.name === 'address')) {
   db.exec(`ALTER TABLE users ADD COLUMN address TEXT NOT NULL DEFAULT ''`);
+}
+if (!cols.some((c) => c.name === 'specialty')) {
+  db.exec(`ALTER TABLE users ADD COLUMN specialty TEXT NOT NULL DEFAULT ''`);
 }
 
 export default db;

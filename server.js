@@ -44,7 +44,7 @@ function requireAdmin(req, res, next) {
 }
 
 const userPublicColumns =
-  'id, first_name, last_name, gender, birth_place, citizenship, address, phone, consent, admin_comment, created_at, updated_at';
+  'id, first_name, last_name, gender, birth_place, citizenship, address, specialty, phone, consent, admin_comment, created_at, updated_at';
 
 // Возвращает массив произвольных полей пользователя [{id, field_name, field_value}]
 function getCustomFields(userId) {
@@ -108,7 +108,7 @@ function verifyOtp(phone, code) {
 
 // Регистрация пользователя
 app.post('/api/register', (req, res) => {
-  const { first_name, last_name, gender, birth_place, citizenship, address, phone, consent, code } =
+  const { first_name, last_name, gender, birth_place, citizenship, address, specialty, phone, consent, code } =
     req.body || {};
 
   const fn = (first_name || '').trim();
@@ -116,8 +116,9 @@ app.post('/api/register', (req, res) => {
   const bp = (birth_place || '').trim();
   const cit = (citizenship || '').trim();
   const addr = (address || '').trim();
+  const spec = (specialty || '').trim();
 
-  if (!fn || !ln || !bp || !cit || !addr) {
+  if (!fn || !ln || !bp || !cit || !addr || !spec) {
     return res.status(400).json({ error: 'Заполните все обязательные поля' });
   }
   if (gender !== 'М' && gender !== 'Ж') {
@@ -144,10 +145,10 @@ app.post('/api/register', (req, res) => {
   const now = new Date().toISOString();
   const info = db
     .prepare(
-      `INSERT INTO users (first_name, last_name, gender, birth_place, citizenship, address, phone, consent, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
+      `INSERT INTO users (first_name, last_name, gender, birth_place, citizenship, address, specialty, phone, consent, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
     )
-    .run(fn, ln, gender, bp, cit, addr, normPhone, now, now);
+    .run(fn, ln, gender, bp, cit, addr, spec, normPhone, now, now);
 
   db.prepare('DELETE FROM otp_codes WHERE phone = ?').run(normPhone);
 
@@ -211,10 +212,10 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
       .prepare(
         `SELECT ${userPublicColumns} FROM users
          WHERE first_name LIKE ? OR last_name LIKE ? OR phone LIKE ?
-            OR birth_place LIKE ? OR citizenship LIKE ? OR address LIKE ?
+            OR birth_place LIKE ? OR citizenship LIKE ? OR address LIKE ? OR specialty LIKE ?
          ORDER BY created_at DESC`
       )
-      .all(like, like, like, like, like, like);
+      .all(like, like, like, like, like, like, like);
   } else {
     rows = db.prepare(`SELECT ${userPublicColumns} FROM users ORDER BY created_at DESC`).all();
   }
@@ -233,7 +234,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Пользователь не найден' });
 
-  const { first_name, last_name, gender, birth_place, citizenship, address, phone, admin_comment, custom_fields } =
+  const { first_name, last_name, gender, birth_place, citizenship, address, specialty, phone, admin_comment, custom_fields } =
     req.body || {};
 
   const fn = (first_name || '').trim();
@@ -241,6 +242,7 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   const bp = (birth_place || '').trim();
   const cit = (citizenship || '').trim();
   const addr = (address || '').trim();
+  const spec = (specialty || '').trim();
   if (!fn || !ln || !bp || !cit) {
     return res.status(400).json({ error: 'Заполните все обязательные поля' });
   }
@@ -257,9 +259,9 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   }
 
   db.prepare(
-    `UPDATE users SET first_name=?, last_name=?, gender=?, birth_place=?, citizenship=?, address=?, phone=?, admin_comment=?, updated_at=?
+    `UPDATE users SET first_name=?, last_name=?, gender=?, birth_place=?, citizenship=?, address=?, specialty=?, phone=?, admin_comment=?, updated_at=?
      WHERE id=?`
-  ).run(fn, ln, gender, bp, cit, addr, normPhone, (admin_comment || '').trim(), new Date().toISOString(), id);
+  ).run(fn, ln, gender, bp, cit, addr, spec, normPhone, (admin_comment || '').trim(), new Date().toISOString(), id);
 
   // Полностью пересохраняем произвольные поля (если переданы)
   if (Array.isArray(custom_fields)) {
@@ -328,6 +330,7 @@ app.get('/api/admin/export', requireAdmin, async (req, res) => {
     { header: 'Место рождения', key: 'birth_place', width: 28 },
     { header: 'Гражданство', key: 'citizenship', width: 20 },
     { header: 'Адрес проживания', key: 'address', width: 32 },
+    { header: 'Специальность', key: 'specialty', width: 28 },
     { header: 'Телефон', key: 'phone', width: 18 },
     { header: 'Согласие', key: 'consent', width: 10 },
     { header: 'Комментарий администратора', key: 'admin_comment', width: 40 },

@@ -70,6 +70,7 @@
               <th>Место рождения</th>
               <th>Гражданство</th>
               <th>Адрес проживания</th>
+              <th>Специальность</th>
               <th>Телефон</th>
               <th>Согласие</th>
               <th>Доп. данные</th>
@@ -108,6 +109,8 @@
           </div>
           <div class="form-row"><label>Место рождения</label><input type="text" name="birth_place" /></div>
           <div class="form-row"><label>Адрес фактического проживания</label><input type="text" name="address" /></div>
+          <div class="form-row"><label>Специальность</label><select name="specialty" id="editSpecialty"></select></div>
+          <div class="form-row" id="editSpecialtyOtherRow" style="display:none;"><label>Своя специальность</label><input type="text" name="specialty_other" id="editSpecialtyOther" placeholder="введите название" /></div>
           <div class="form-row"><label>Телефон</label><input type="tel" name="phone" /></div>
           <div class="form-row"><label>Комментарий администратора</label><textarea name="admin_comment"></textarea></div>
 
@@ -130,8 +133,41 @@
 
   <footer class="site-footer">© 2026 Единый реестр граждан. Панель администратора.</footer>
 
+  <script src="/specialties.js"></script>
   <script>
     const $ = (s) => document.querySelector(s);
+
+    // Список специальностей в окне редактирования
+    const editSpecialty = document.getElementById('editSpecialty');
+    const editSpecialtyOtherRow = document.getElementById('editSpecialtyOtherRow');
+    const editSpecialtyOther = document.getElementById('editSpecialtyOther');
+    window.fillSpecialtyOptions(editSpecialty);
+    editSpecialty.addEventListener('change', () => {
+      const isOther = editSpecialty.value === window.SPECIALTY_OTHER;
+      editSpecialtyOtherRow.style.display = isOther ? 'block' : 'none';
+      if (!isOther) editSpecialtyOther.value = '';
+    });
+    // Устанавливает значение специальности в форме редактирования
+    function setEditSpecialty(value) {
+      const v = value || '';
+      if (v && window.SPECIALTIES.includes(v)) {
+        editSpecialty.value = v;
+        editSpecialtyOtherRow.style.display = 'none';
+        editSpecialtyOther.value = '';
+      } else if (v) {
+        editSpecialty.value = window.SPECIALTY_OTHER;
+        editSpecialtyOtherRow.style.display = 'block';
+        editSpecialtyOther.value = v;
+      } else {
+        editSpecialty.value = '';
+        editSpecialtyOtherRow.style.display = 'none';
+        editSpecialtyOther.value = '';
+      }
+    }
+    function getEditSpecialty() {
+      if (editSpecialty.value === window.SPECIALTY_OTHER) return editSpecialtyOther.value.trim();
+      return editSpecialty.value;
+    }
 
     function msgBox(el, text, type) {
       el.textContent = text;
@@ -197,7 +233,7 @@
     function renderRows(rows) {
       const tbody = $('#tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px;">Записи не найдены</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="14" class="muted" style="text-align:center;padding:24px;">Записи не найдены</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map((r) => {
@@ -214,6 +250,7 @@
           <td data-label="Место рождения">${esc(r.birth_place)}</td>
           <td data-label="Гражданство">${esc(r.citizenship)}</td>
           <td data-label="Адрес">${r.address ? esc(r.address) : '<span class="muted">—</span>'}</td>
+          <td data-label="Специальность">${r.specialty ? esc(r.specialty) : '<span class="muted">—</span>'}</td>
           <td data-label="Телефон">${esc(r.phone)}</td>
           <td data-label="Согласие"><span class="tag ${r.consent ? 'tag-yes' : 'tag-no'}">${r.consent ? 'Да' : 'Нет'}</span></td>
           <td data-label="Доп. данные">${cfHtml}</td>
@@ -284,6 +321,7 @@
       f.citizenship.value = u.citizenship;
       f.birth_place.value = u.birth_place;
       f.address.value = u.address || '';
+      setEditSpecialty(u.specialty);
       f.phone.value = u.phone;
       f.admin_comment.value = u.admin_comment || '';
       // произвольные поля
@@ -309,6 +347,7 @@
         birth_place: f.birth_place.value,
         citizenship: f.citizenship.value,
         address: f.address.value,
+        specialty: getEditSpecialty(),
         phone: f.phone.value,
         admin_comment: f.admin_comment.value,
         custom_fields

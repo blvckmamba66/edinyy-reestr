@@ -68,6 +68,16 @@
         </div>
 
         <div class="form-row">
+          <label>Специальность <span class="req">*</span></label>
+          <select name="specialty" id="specialty"></select>
+        </div>
+
+        <div class="form-row" id="specialtyOtherRow" style="display:none;">
+          <label>Укажите свою специальность <span class="req">*</span></label>
+          <input type="text" name="specialty_other" id="specialtyOther" placeholder="введите название специальности" />
+        </div>
+
+        <div class="form-row">
           <label>Номер телефона <span class="req">*</span></label>
           <div class="phone-row">
             <input type="tel" name="phone" id="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
@@ -103,6 +113,7 @@
 
   <footer class="site-footer">© 2026 Единый реестр граждан.</footer>
 
+  <script src="/specialties.js"></script>
   <script>
     const form = document.getElementById('form');
     const msg = document.getElementById('msg');
@@ -110,6 +121,23 @@
     const otpBtn = document.getElementById('otpBtn');
     const codeRow = document.getElementById('codeRow');
     const codeHint = document.getElementById('codeHint');
+
+    // Наполняем список специальностей и показываем поле «Другое» при выборе
+    const specialtySel = document.getElementById('specialty');
+    const specialtyOtherRow = document.getElementById('specialtyOtherRow');
+    const specialtyOther = document.getElementById('specialtyOther');
+    window.fillSpecialtyOptions(specialtySel);
+    specialtySel.addEventListener('change', () => {
+      const isOther = specialtySel.value === window.SPECIALTY_OTHER;
+      specialtyOtherRow.style.display = isOther ? 'block' : 'none';
+      if (!isOther) specialtyOther.value = '';
+    });
+
+    // Возвращает итоговое значение специальности (или '' если не выбрано)
+    function getSpecialty() {
+      if (specialtySel.value === window.SPECIALTY_OTHER) return specialtyOther.value.trim();
+      return specialtySel.value;
+    }
 
     function showMsg(text, type) {
       msg.textContent = text;
@@ -172,6 +200,7 @@
         birth_place: form.birth_place.value,
         citizenship: form.citizenship.value,
         address: form.address.value,
+        specialty: getSpecialty(),
         phone: form.phone.value,
         code: form.code.value,
         consent: form.consent.checked
