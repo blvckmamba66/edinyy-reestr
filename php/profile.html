@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Личный кабинет — Единый реестр</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <div class="emblem">ЕР</div>
+      <div class="site-header__titles">
+        <span class="site-header__title">Единый реестр граждан</span>
+        <span class="site-header__subtitle">Личный кабинет</span>
+      </div>
+      <nav class="site-header__nav">
+        <a href="/">Главная</a>
+        <a href="#" id="logoutLink">Выйти</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container narrow">
+    <div class="card">
+      <h1>Личный кабинет</h1>
+      <div id="msg" class="msg"></div>
+      <dl class="profile-grid" id="profile" style="display:none;">
+        <dt>Имя</dt><dd id="f_first_name"></dd>
+        <dt>Фамилия</dt><dd id="f_last_name"></dd>
+        <dt>Пол</dt><dd id="f_gender"></dd>
+        <dt>Место рождения</dt><dd id="f_birth_place"></dd>
+        <dt>Гражданство</dt><dd id="f_citizenship"></dd>
+        <dt>Адрес проживания</dt><dd id="f_address"></dd>
+        <dt>Специальность</dt><dd id="f_specialty"></dd>
+        <dt>Телефон</dt><dd id="f_phone"></dd>
+        <dt>Дата регистрации</dt><dd id="f_created_at"></dd>
+      </dl>
+    </div>
+  </main>
+
+  <footer class="site-footer">© 2026 Единый реестр граждан.</footer>
+
+  <script>
+    const msg = document.getElementById('msg');
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + (type === 'success' ? 'msg-success' : 'msg-error');
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/me.php');
+        if (res.status === 401) {
+          window.location.href = '/login.html';
+          return;
+        }
+        const u = await res.json();
+        if (!res.ok) return showMsg(u.error || 'Ошибка', 'error');
+        document.getElementById('f_first_name').textContent = u.first_name;
+        document.getElementById('f_last_name').textContent = u.last_name;
+        document.getElementById('f_gender').textContent = u.gender === 'М' ? 'Мужской' : 'Женский';
+        document.getElementById('f_birth_place').textContent = u.birth_place;
+        document.getElementById('f_citizenship').textContent = u.citizenship;
+        document.getElementById('f_address').textContent = u.address || '—';
+        document.getElementById('f_specialty').textContent = u.specialty || '—';
+        document.getElementById('f_phone').textContent = u.phone;
+        document.getElementById('f_created_at').textContent = new Date(u.created_at).toLocaleString('ru-RU');
+        document.getElementById('profile').style.display = 'grid';
+      } catch (e) {
+        showMsg('Ошибка соединения с сервером', 'error');
+      }
+    }
+
+    document.getElementById('logoutLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/logout.php', { method: 'POST' });
+      window.location.href = '/';
+    });
+
+    load();
+  </script>
+</body>
+</html>

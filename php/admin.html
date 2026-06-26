@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Администрирование — Единый реестр</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <div class="emblem">ЕР</div>
+      <div class="site-header__titles">
+        <span class="site-header__title">Единый реестр граждан</span>
+        <span class="site-header__subtitle">Панель администратора</span>
+      </div>
+      <nav class="site-header__nav">
+        <a href="/">На сайт</a>
+        <a href="#" id="logoutLink" style="display:none;">Выйти</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Экран входа -->
+    <section id="loginView" class="narrow" style="margin:0 auto;">
+      <div class="card">
+        <h1>Вход для администратора</h1>
+        <div id="loginMsg" class="msg"></div>
+        <form id="loginForm" novalidate>
+          <div class="form-row">
+            <label>Логин</label>
+            <input type="text" name="login" autocomplete="username" />
+          </div>
+          <div class="form-row">
+            <label>Пароль</label>
+            <input type="text" name="password" id="pw" autocomplete="current-password" style="-webkit-text-security:disc;" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Войти</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Панель -->
+    <section id="panelView" style="display:none;">
+      <h1 style="color:var(--navy);">Реестр пользователей</h1>
+
+      <div class="stats">
+        <div class="stat"><div class="stat__num" id="statTotal">0</div><div class="stat__label">Всего записей</div></div>
+        <div class="stat"><div class="stat__num" id="statM">0</div><div class="stat__label">Мужчин</div></div>
+        <div class="stat"><div class="stat__num" id="statF">0</div><div class="stat__label">Женщин</div></div>
+      </div>
+
+      <div id="panelMsg" class="msg"></div>
+
+      <div class="toolbar">
+        <input type="text" id="search" class="search" placeholder="Поиск по имени, фамилии, телефону, месту рождения, гражданству…" />
+        <button class="btn btn-outline btn-sm" id="refreshBtn">Обновить</button>
+        <a class="btn btn-gold btn-sm" href="/api/admin_export.php">Выгрузить в Excel</a>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Имя</th>
+              <th>Фамилия</th>
+              <th>Пол</th>
+              <th>Место рождения</th>
+              <th>Гражданство</th>
+              <th>Адрес проживания</th>
+              <th>Специальность</th>
+              <th>Телефон</th>
+              <th>Согласие</th>
+              <th>Доп. данные</th>
+              <th>Комментарий</th>
+              <th>Зарегистрирован</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Модальное окно редактирования -->
+  <div class="modal-backdrop" id="modal">
+    <div class="modal">
+      <div class="modal__header">
+        <h2>Редактирование записи</h2>
+        <button class="modal__close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal__body">
+        <div id="modalMsg" class="msg"></div>
+        <form id="editForm">
+          <input type="hidden" name="id" />
+          <div class="grid-2">
+            <div class="form-row"><label>Имя</label><input type="text" name="first_name" /></div>
+            <div class="form-row"><label>Фамилия</label><input type="text" name="last_name" /></div>
+          </div>
+          <div class="grid-2">
+            <div class="form-row">
+              <label>Пол</label>
+              <select name="gender"><option value="М">М</option><option value="Ж">Ж</option></select>
+            </div>
+            <div class="form-row"><label>Гражданство</label><input type="text" name="citizenship" /></div>
+          </div>
+          <div class="form-row"><label>Место рождения</label><input type="text" name="birth_place" /></div>
+          <div class="form-row"><label>Адрес фактического проживания</label><input type="text" name="address" /></div>
+          <div class="form-row"><label>Специальность</label><select name="specialty" id="editSpecialty"></select></div>
+          <div class="form-row" id="editSpecialtyOtherRow" style="display:none;"><label>Своя специальность</label><input type="text" name="specialty_other" id="editSpecialtyOther" placeholder="введите название" /></div>
+          <div class="form-row"><label>Телефон</label><input type="tel" name="phone" /></div>
+          <div class="form-row"><label>Комментарий администратора</label><textarea name="admin_comment"></textarea></div>
+
+          <div class="custom-fields">
+            <div class="custom-fields__head">
+              <label style="margin:0;">Дополнительные данные</label>
+              <button type="button" class="btn btn-outline btn-sm" id="addFieldBtn">+ Добавить поле</button>
+            </div>
+            <p class="hint" style="margin:0 0 10px;">Любые произвольные сведения: например, «Дети» — «двое», «Образование» — «высшее».</p>
+            <div id="customFields"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-outline" id="modalCancel">Отмена</button>
+        <button class="btn btn-primary" id="modalSave">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">© 2026 Единый реестр граждан. Панель администратора.</footer>
+
+  <script src="/specialties.js"></script>
+  <script>
+    const $ = (s) => document.querySelector(s);
+
+    // Список специальностей в окне редактирования
+    const editSpecialty = document.getElementById('editSpecialty');
+    const editSpecialtyOtherRow = document.getElementById('editSpecialtyOtherRow');
+    const editSpecialtyOther = document.getElementById('editSpecialtyOther');
+    window.fillSpecialtyOptions(editSpecialty);
+    editSpecialty.addEventListener('change', () => {
+      const isOther = editSpecialty.value === window.SPECIALTY_OTHER;
+      editSpecialtyOtherRow.style.display = isOther ? 'block' : 'none';
+      if (!isOther) editSpecialtyOther.value = '';
+    });
+    // Устанавливает значение специальности в форме редактирования
+    function setEditSpecialty(value) {
+      const v = value || '';
+      if (v && window.SPECIALTIES.includes(v)) {
+        editSpecialty.value = v;
+        editSpecialtyOtherRow.style.display = 'none';
+        editSpecialtyOther.value = '';
+      } else if (v) {
+        editSpecialty.value = window.SPECIALTY_OTHER;
+        editSpecialtyOtherRow.style.display = 'block';
+        editSpecialtyOther.value = v;
+      } else {
+        editSpecialty.value = '';
+        editSpecialtyOtherRow.style.display = 'none';
+        editSpecialtyOther.value = '';
+      }
+    }
+    function getEditSpecialty() {
+      if (editSpecialty.value === window.SPECIALTY_OTHER) return editSpecialtyOther.value.trim();
+      return editSpecialty.value;
+    }
+
+    function msgBox(el, text, type) {
+      el.textContent = text;
+      el.className = 'msg show ' + (type === 'success' ? 'msg-success' : 'msg-error');
+    }
+    function clearMsg(el) { el.className = 'msg'; el.textContent = ''; }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    // ---- Состояние сессии ----
+    async function checkSession() {
+      const res = await fetch('/api/admin_session.php');
+      const { isAdmin } = await res.json();
+      if (isAdmin) showPanel(); else showLogin();
+    }
+    function showLogin() {
+      $('#loginView').style.display = 'block';
+      $('#panelView').style.display = 'none';
+      $('#logoutLink').style.display = 'none';
+    }
+    function showPanel() {
+      $('#loginView').style.display = 'none';
+      $('#panelView').style.display = 'block';
+      $('#logoutLink').style.display = 'inline';
+      loadUsers();
+    }
+
+    // ---- Вход ----
+    $('#loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearMsg($('#loginMsg'));
+      const res = await fetch('/api/admin_login.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: e.target.login.value, password: e.target.password.value })
+      });
+      const json = await res.json();
+      if (res.ok) showPanel(); else msgBox($('#loginMsg'), json.error || 'Ошибка входа', 'error');
+    });
+
+    $('#logoutLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await fetch('/api/admin_logout.php', { method: 'POST' });
+      showLogin();
+    });
+
+    // ---- Загрузка пользователей ----
+    let debounce;
+    async function loadUsers() {
+      clearMsg($('#panelMsg'));
+      const q = $('#search').value.trim();
+      const res = await fetch('/api/admin_users.php' + (q ? '?search=' + encodeURIComponent(q) : ''));
+      if (res.status === 401) return showLogin();
+      const rows = await res.json();
+      renderRows(rows);
+      $('#statTotal').textContent = rows.length;
+      $('#statM').textContent = rows.filter((r) => r.gender === 'М').length;
+      $('#statF').textContent = rows.filter((r) => r.gender === 'Ж').length;
+    }
+
+    function renderRows(rows) {
+      const tbody = $('#tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="14" class="muted" style="text-align:center;padding:24px;">Записи не найдены</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map((r) => {
+        const cf = Array.isArray(r.custom_fields) ? r.custom_fields : [];
+        const cfHtml = cf.length
+          ? '<div class="cf-chips">' + cf.map((f) => `<span class="cf-chip">${esc(f.field_name)}: ${esc(f.field_value)}</span>`).join('') + '</div>'
+          : '<span class="muted">—</span>';
+        return `
+        <tr>
+          <td data-label="ID">${r.id}</td>
+          <td data-label="Имя">${esc(r.first_name)}</td>
+          <td data-label="Фамилия">${esc(r.last_name)}</td>
+          <td data-label="Пол">${esc(r.gender)}</td>
+          <td data-label="Место рождения">${esc(r.birth_place)}</td>
+          <td data-label="Гражданство">${esc(r.citizenship)}</td>
+          <td data-label="Адрес">${r.address ? esc(r.address) : '<span class="muted">—</span>'}</td>
+          <td data-label="Специальность">${r.specialty ? esc(r.specialty) : '<span class="muted">—</span>'}</td>
+          <td data-label="Телефон">${esc(r.phone)}</td>
+          <td data-label="Согласие"><span class="tag ${r.consent ? 'tag-yes' : 'tag-no'}">${r.consent ? 'Да' : 'Нет'}</span></td>
+          <td data-label="Доп. данные">${cfHtml}</td>
+          <td data-label="Комментарий">${r.admin_comment ? esc(r.admin_comment) : '<span class="muted">—</span>'}</td>
+          <td data-label="Зарегистрирован" class="muted">${new Date(r.created_at).toLocaleString('ru-RU')}</td>
+          <td class="actions-cell">
+            <button class="btn btn-outline btn-sm" data-edit="${r.id}">Изменить</button>
+            <button class="btn btn-danger btn-sm" data-del="${r.id}">Удалить</button>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    $('#search').addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(loadUsers, 300);
+    });
+    $('#refreshBtn').addEventListener('click', loadUsers);
+
+    // ---- Делегирование кликов по таблице ----
+    $('#tbody').addEventListener('click', async (e) => {
+      const editId = e.target.getAttribute('data-edit');
+      const delId = e.target.getAttribute('data-del');
+      if (editId) openEdit(editId);
+      if (delId) deleteUser(delId);
+    });
+
+    async function deleteUser(id) {
+      if (!confirm('Удалить запись №' + id + '? Действие необратимо.')) return;
+      const res = await fetch('/api/admin_user_delete.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const json = await res.json();
+      if (res.ok) { msgBox($('#panelMsg'), 'Запись удалена', 'success'); loadUsers(); }
+      else msgBox($('#panelMsg'), json.error || 'Ошибка удаления', 'error');
+    }
+
+    // ---- Модальное окно ----
+    const modal = $('#modal');
+    function closeModal() { modal.classList.remove('show'); clearMsg($('#modalMsg')); }
+    $('#modalClose').addEventListener('click', closeModal);
+    $('#modalCancel').addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    // ---- Произвольные поля ----
+    function addCustomFieldRow(name = '', value = '') {
+      const wrap = $('#customFields');
+      const row = document.createElement('div');
+      row.className = 'cf-row';
+      row.innerHTML = `
+        <input type="text" class="cf-name" placeholder="Название (напр. Дети)" />
+        <input type="text" class="cf-value" placeholder="Значение (напр. двое)" />
+        <button type="button" class="cf-del" title="Удалить поле">&times;</button>`;
+      row.querySelector('.cf-name').value = name;
+      row.querySelector('.cf-value').value = value;
+      row.querySelector('.cf-del').addEventListener('click', () => row.remove());
+      wrap.appendChild(row);
+    }
+    $('#addFieldBtn').addEventListener('click', () => addCustomFieldRow());
+
+    async function openEdit(id) {
+      const res = await fetch('/api/admin_users.php?id=' + id);
+      if (res.status === 401) return showLogin();
+      const u = await res.json();
+      const f = $('#editForm');
+      f.id.value = u.id;
+      f.first_name.value = u.first_name;
+      f.last_name.value = u.last_name;
+      f.gender.value = u.gender;
+      f.citizenship.value = u.citizenship;
+      f.birth_place.value = u.birth_place;
+      f.address.value = u.address || '';
+      setEditSpecialty(u.specialty);
+      f.phone.value = u.phone;
+      f.admin_comment.value = u.admin_comment || '';
+      // произвольные поля
+      $('#customFields').innerHTML = '';
+      (u.custom_fields || []).forEach((cf) => addCustomFieldRow(cf.field_name, cf.field_value));
+      clearMsg($('#modalMsg'));
+      modal.classList.add('show');
+    }
+
+    $('#modalSave').addEventListener('click', async () => {
+      const f = $('#editForm');
+      const id = f.id.value;
+      const custom_fields = Array.from(document.querySelectorAll('#customFields .cf-row'))
+        .map((row) => ({
+          field_name: row.querySelector('.cf-name').value.trim(),
+          field_value: row.querySelector('.cf-value').value.trim()
+        }))
+        .filter((cf) => cf.field_name);
+      const body = {
+        id,
+        first_name: f.first_name.value,
+        last_name: f.last_name.value,
+        gender: f.gender.value,
+        birth_place: f.birth_place.value,
+        citizenship: f.citizenship.value,
+        address: f.address.value,
+        specialty: getEditSpecialty(),
+        phone: f.phone.value,
+        admin_comment: f.admin_comment.value,
+        custom_fields
+      };
+      const res = await fetch('/api/admin_user_save.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const json = await res.json();
+      if (res.ok) { closeModal(); msgBox($('#panelMsg'), 'Изменения сохранены', 'success'); loadUsers(); }
+      else msgBox($('#modalMsg'), json.error || 'Ошибка сохранения', 'error');
+    });
+
+    checkSession();
+  </script>
+</body>
+</html>

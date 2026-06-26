@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Регистрация — Единый реестр</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <div class="emblem">ЕР</div>
+      <div class="site-header__titles">
+        <span class="site-header__title">Единый реестр граждан</span>
+        <span class="site-header__subtitle">Информационная система</span>
+      </div>
+      <nav class="site-header__nav">
+        <a href="/">Главная</a>
+        <a href="/register.html">Регистрация</a>
+        <a href="/login.html">Вход</a>
+        <a href="/admin.html">Администратор</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container narrow">
+    <div class="card">
+      <h1>Регистрация в реестре</h1>
+      <p class="lead">Заполните анкету. Поля, отмеченные <span class="req">*</span>, обязательны.</p>
+
+      <div id="msg" class="msg"></div>
+
+      <form id="form" novalidate>
+        <div class="grid-2">
+          <div class="form-row">
+            <label>Имя <span class="req">*</span></label>
+            <input type="text" name="first_name" autocomplete="given-name" />
+          </div>
+          <div class="form-row">
+            <label>Фамилия <span class="req">*</span></label>
+            <input type="text" name="last_name" autocomplete="family-name" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-row">
+            <label>Пол <span class="req">*</span></label>
+            <select name="gender">
+              <option value="">— выберите —</option>
+              <option value="М">Мужской (М)</option>
+              <option value="Ж">Женский (Ж)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Гражданство <span class="req">*</span></label>
+            <input type="text" name="citizenship" placeholder="например, РФ" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Место рождения <span class="req">*</span></label>
+          <input type="text" name="birth_place" placeholder="город, регион, страна" />
+        </div>
+
+        <div class="form-row">
+          <label>Адрес фактического проживания <span class="req">*</span></label>
+          <input type="text" name="address" placeholder="индекс, город, улица, дом, квартира" autocomplete="street-address" />
+        </div>
+
+        <div class="form-row">
+          <label>Специальность <span class="req">*</span></label>
+          <select name="specialty" id="specialty"></select>
+        </div>
+
+        <div class="form-row" id="specialtyOtherRow" style="display:none;">
+          <label>Укажите свою специальность <span class="req">*</span></label>
+          <input type="text" name="specialty_other" id="specialtyOther" placeholder="введите название специальности" />
+        </div>
+
+        <div class="form-row">
+          <label>Номер телефона <span class="req">*</span></label>
+          <div class="phone-row">
+            <input type="tel" name="phone" id="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
+            <button type="button" class="btn btn-outline" id="otpBtn">Получить код</button>
+          </div>
+          <div class="hint">На номер придёт SMS с кодом подтверждения. Номер используется для входа.</div>
+        </div>
+
+        <!-- Блок подтверждения кодом, появляется после запроса -->
+        <div class="form-row" id="codeRow" style="display:none;">
+          <label>Код из SMS <span class="req">*</span></label>
+          <input type="text" inputmode="numeric" maxlength="6" name="code" id="code" placeholder="6 цифр" autocomplete="one-time-code" />
+          <div class="hint" id="codeHint">Введите код, отправленный на ваш номер.</div>
+        </div>
+
+        <div class="form-row">
+          <label class="consent">
+            <input type="checkbox" name="consent" />
+            <span>
+              Я даю согласие на предоставление, сбор, хранение и обработку моих
+              персональных данных в соответствии с действующим законодательством
+              о защите персональных данных. <span class="req">*</span>
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Зарегистрироваться</button>
+      </form>
+
+      <p class="hint" style="margin-top:16px;">Уже зарегистрированы? <a href="/login.html">Войти</a></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">© 2026 Единый реестр граждан.</footer>
+
+  <script src="/specialties.js"></script>
+  <script>
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('submitBtn');
+    const otpBtn = document.getElementById('otpBtn');
+    const codeRow = document.getElementById('codeRow');
+    const codeHint = document.getElementById('codeHint');
+
+    // Наполняем список специальностей и показываем поле «Другое» при выборе
+    const specialtySel = document.getElementById('specialty');
+    const specialtyOtherRow = document.getElementById('specialtyOtherRow');
+    const specialtyOther = document.getElementById('specialtyOther');
+    window.fillSpecialtyOptions(specialtySel);
+    specialtySel.addEventListener('change', () => {
+      const isOther = specialtySel.value === window.SPECIALTY_OTHER;
+      specialtyOtherRow.style.display = isOther ? 'block' : 'none';
+      if (!isOther) specialtyOther.value = '';
+    });
+
+    // Возвращает итоговое значение специальности (или '' если не выбрано)
+    function getSpecialty() {
+      if (specialtySel.value === window.SPECIALTY_OTHER) return specialtyOther.value.trim();
+      return specialtySel.value;
+    }
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + (type === 'success' ? 'msg-success' : 'msg-error');
+    }
+
+    // Запрос кода подтверждения
+    otpBtn.addEventListener('click', async () => {
+      const phone = form.phone.value;
+      if (!phone.trim()) { showMsg('Сначала введите номер телефона', 'error'); return; }
+      otpBtn.disabled = true;
+      const original = otpBtn.textContent;
+      otpBtn.textContent = 'Отправка…';
+      try {
+        const res = await fetch('/api/otp_request.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          showMsg(json.error || 'Не удалось отправить код', 'error');
+        } else {
+          codeRow.style.display = 'block';
+          if (json.demo) {
+            showMsg('Демо-режим: SMS не отправляется. Ваш код: ' + json.code, 'success');
+            codeHint.textContent = 'Демо-режим. Код подтверждения: ' + json.code;
+            document.getElementById('code').value = json.code;
+          } else {
+            showMsg('Код отправлен по SMS на номер ' + phone, 'success');
+            codeHint.textContent = 'Введите код, отправленный на ' + phone;
+          }
+          // Таймер на повторную отправку
+          let sec = 30;
+          otpBtn.textContent = 'Повторно через ' + sec + 'с';
+          const t = setInterval(() => {
+            sec--;
+            if (sec <= 0) { clearInterval(t); otpBtn.disabled = false; otpBtn.textContent = 'Отправить код заново'; }
+            else otpBtn.textContent = 'Повторно через ' + sec + 'с';
+          }, 1000);
+          return;
+        }
+      } catch (e) {
+        showMsg('Ошибка соединения с сервером', 'error');
+      }
+      otpBtn.disabled = false;
+      otpBtn.textContent = original;
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (codeRow.style.display === 'none') {
+        showMsg('Сначала получите и введите код подтверждения по SMS', 'error');
+        return;
+      }
+      const data = {
+        first_name: form.first_name.value,
+        last_name: form.last_name.value,
+        gender: form.gender.value,
+        birth_place: form.birth_place.value,
+        citizenship: form.citizenship.value,
+        address: form.address.value,
+        specialty: getSpecialty(),
+        phone: form.phone.value,
+        code: form.code.value,
+        consent: form.consent.checked
+      };
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/register.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          showMsg(json.error || 'Ошибка регистрации', 'error');
+        } else {
+          showMsg('Регистрация успешно завершена. Перенаправление в личный кабинет…', 'success');
+          setTimeout(() => (window.location.href = '/profile.html'), 1000);
+        }
+      } catch (err) {
+        showMsg('Ошибка соединения с сервером', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
