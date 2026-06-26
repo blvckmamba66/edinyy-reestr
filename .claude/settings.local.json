@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(curl -s -c cookies_user.txt -X POST http://localhost:3000/api/register -H \"Content-Type: application/json; charset=utf-8\" --data-binary @test_reg.json)",
-      "Bash(curl -s -b cookies_user.txt http://localhost:3000/api/me)"
-    ]
-  }
-}
