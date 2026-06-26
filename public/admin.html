@@ -190,16 +190,16 @@
       }
       tbody.innerHTML = rows.map((r) => `
         <tr>
-          <td>${r.id}</td>
-          <td>${esc(r.first_name)}</td>
-          <td>${esc(r.last_name)}</td>
-          <td>${esc(r.gender)}</td>
-          <td>${esc(r.birth_place)}</td>
-          <td>${esc(r.citizenship)}</td>
-          <td>${esc(r.phone)}</td>
-          <td><span class="tag ${r.consent ? 'tag-yes' : 'tag-no'}">${r.consent ? 'Да' : 'Нет'}</span></td>
-          <td>${r.admin_comment ? esc(r.admin_comment) : '<span class="muted">—</span>'}</td>
-          <td class="muted">${new Date(r.created_at).toLocaleString('ru-RU')}</td>
+          <td data-label="ID">${r.id}</td>
+          <td data-label="Имя">${esc(r.first_name)}</td>
+          <td data-label="Фамилия">${esc(r.last_name)}</td>
+          <td data-label="Пол">${esc(r.gender)}</td>
+          <td data-label="Место рождения">${esc(r.birth_place)}</td>
+          <td data-label="Гражданство">${esc(r.citizenship)}</td>
+          <td data-label="Телефон">${esc(r.phone)}</td>
+          <td data-label="Согласие"><span class="tag ${r.consent ? 'tag-yes' : 'tag-no'}">${r.consent ? 'Да' : 'Нет'}</span></td>
+          <td data-label="Комментарий">${r.admin_comment ? esc(r.admin_comment) : '<span class="muted">—</span>'}</td>
+          <td data-label="Зарегистрирован" class="muted">${new Date(r.created_at).toLocaleString('ru-RU')}</td>
           <td class="actions-cell">
             <button class="btn btn-outline btn-sm" data-edit="${r.id}">Изменить</button>
             <button class="btn btn-danger btn-sm" data-del="${r.id}">Удалить</button>
