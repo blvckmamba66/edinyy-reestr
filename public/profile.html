@@ -31,6 +31,7 @@
         <dt>Пол</dt><dd id="f_gender"></dd>
         <dt>Место рождения</dt><dd id="f_birth_place"></dd>
         <dt>Гражданство</dt><dd id="f_citizenship"></dd>
+        <dt>Адрес проживания</dt><dd id="f_address"></dd>
         <dt>Телефон</dt><dd id="f_phone"></dd>
         <dt>Дата регистрации</dt><dd id="f_created_at"></dd>
       </dl>
@@ -60,6 +61,7 @@
         document.getElementById('f_gender').textContent = u.gender === 'М' ? 'Мужской' : 'Женский';
         document.getElementById('f_birth_place').textContent = u.birth_place;
         document.getElementById('f_citizenship').textContent = u.citizenship;
+        document.getElementById('f_address').textContent = u.address || '—';
         document.getElementById('f_phone').textContent = u.phone;
         document.getElementById('f_created_at').textContent = new Date(u.created_at).toLocaleString('ru-RU');
         document.getElementById('profile').style.display = 'grid';

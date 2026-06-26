@@ -53,7 +53,7 @@
           </div>
           <div class="form-row">
             <label>Гражданство <span class="req">*</span></label>
-            <input type="text" name="citizenship" placeholder="например, Российская Федерация" />
+            <input type="text" name="citizenship" placeholder="например, РФ" />
           </div>
         </div>
 
@@ -63,9 +63,24 @@
         </div>
 
         <div class="form-row">
+          <label>Адрес фактического проживания <span class="req">*</span></label>
+          <input type="text" name="address" placeholder="индекс, город, улица, дом, квартира" autocomplete="street-address" />
+        </div>
+
+        <div class="form-row">
           <label>Номер телефона <span class="req">*</span></label>
-          <input type="tel" name="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
-          <div class="hint">Используется для входа в личный кабинет.</div>
+          <div class="phone-row">
+            <input type="tel" name="phone" id="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
+            <button type="button" class="btn btn-outline" id="otpBtn">Получить код</button>
+          </div>
+          <div class="hint">На номер придёт SMS с кодом подтверждения. Номер используется для входа.</div>
+        </div>
+
+        <!-- Блок подтверждения кодом, появляется после запроса -->
+        <div class="form-row" id="codeRow" style="display:none;">
+          <label>Код из SMS <span class="req">*</span></label>
+          <input type="text" inputmode="numeric" maxlength="6" name="code" id="code" placeholder="6 цифр" autocomplete="one-time-code" />
+          <div class="hint" id="codeHint">Введите код, отправленный на ваш номер.</div>
         </div>
 
         <div class="form-row">
@@ -92,21 +107,73 @@
     const form = document.getElementById('form');
     const msg = document.getElementById('msg');
     const btn = document.getElementById('submitBtn');
+    const otpBtn = document.getElementById('otpBtn');
+    const codeRow = document.getElementById('codeRow');
+    const codeHint = document.getElementById('codeHint');
 
     function showMsg(text, type) {
       msg.textContent = text;
       msg.className = 'msg show ' + (type === 'success' ? 'msg-success' : 'msg-error');
     }
 
+    // Запрос кода подтверждения
+    otpBtn.addEventListener('click', async () => {
+      const phone = form.phone.value;
+      if (!phone.trim()) { showMsg('Сначала введите номер телефона', 'error'); return; }
+      otpBtn.disabled = true;
+      const original = otpBtn.textContent;
+      otpBtn.textContent = 'Отправка…';
+      try {
+        const res = await fetch('/api/otp/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          showMsg(json.error || 'Не удалось отправить код', 'error');
+        } else {
+          codeRow.style.display = 'block';
+          if (json.demo) {
+            showMsg('Демо-режим: SMS не отправляется. Ваш код: ' + json.code, 'success');
+            codeHint.textContent = 'Демо-режим. Код подтверждения: ' + json.code;
+            document.getElementById('code').value = json.code;
+          } else {
+            showMsg('Код отправлен по SMS на номер ' + phone, 'success');
+            codeHint.textContent = 'Введите код, отправленный на ' + phone;
+          }
+          // Таймер на повторную отправку
+          let sec = 30;
+          otpBtn.textContent = 'Повторно через ' + sec + 'с';
+          const t = setInterval(() => {
+            sec--;
+            if (sec <= 0) { clearInterval(t); otpBtn.disabled = false; otpBtn.textContent = 'Отправить код заново'; }
+            else otpBtn.textContent = 'Повторно через ' + sec + 'с';
+          }, 1000);
+          return;
+        }
+      } catch (e) {
+        showMsg('Ошибка соединения с сервером', 'error');
+      }
+      otpBtn.disabled = false;
+      otpBtn.textContent = original;
+    });
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (codeRow.style.display === 'none') {
+        showMsg('Сначала получите и введите код подтверждения по SMS', 'error');
+        return;
+      }
       const data = {
         first_name: form.first_name.value,
         last_name: form.last_name.value,
         gender: form.gender.value,
         birth_place: form.birth_place.value,
         citizenship: form.citizenship.value,
+        address: form.address.value,
         phone: form.phone.value,
+        code: form.code.value,
         consent: form.consent.checked
       };
       btn.disabled = true;

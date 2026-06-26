@@ -12,3 +12,7 @@ services:
         value: admin
       - key: ADMIN_PASSWORD
         value: admin123
+      # API-ключ SMS.ru для реальной отправки SMS. Задайте значение в дашборде Render
+      # (Environment). Если оставить пустым — работает демо-режим (код показывается на экране).
+      - key: SMSRU_API_ID
+        sync: false

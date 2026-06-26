@@ -69,8 +69,10 @@
               <th>Пол</th>
               <th>Место рождения</th>
               <th>Гражданство</th>
+              <th>Адрес проживания</th>
               <th>Телефон</th>
               <th>Согласие</th>
+              <th>Доп. данные</th>
               <th>Комментарий</th>
               <th>Зарегистрирован</th>
               <th>Действия</th>
@@ -105,8 +107,18 @@
             <div class="form-row"><label>Гражданство</label><input type="text" name="citizenship" /></div>
           </div>
           <div class="form-row"><label>Место рождения</label><input type="text" name="birth_place" /></div>
+          <div class="form-row"><label>Адрес фактического проживания</label><input type="text" name="address" /></div>
           <div class="form-row"><label>Телефон</label><input type="tel" name="phone" /></div>
           <div class="form-row"><label>Комментарий администратора</label><textarea name="admin_comment"></textarea></div>
+
+          <div class="custom-fields">
+            <div class="custom-fields__head">
+              <label style="margin:0;">Дополнительные данные</label>
+              <button type="button" class="btn btn-outline btn-sm" id="addFieldBtn">+ Добавить поле</button>
+            </div>
+            <p class="hint" style="margin:0 0 10px;">Любые произвольные сведения: например, «Дети» — «двое», «Образование» — «высшее».</p>
+            <div id="customFields"></div>
+          </div>
         </form>
       </div>
       <div class="modal__footer">
@@ -185,10 +197,15 @@
     function renderRows(rows) {
       const tbody = $('#tbody');
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="11" class="muted" style="text-align:center;padding:24px;">Записи не найдены</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="13" class="muted" style="text-align:center;padding:24px;">Записи не найдены</td></tr>';
         return;
       }
-      tbody.innerHTML = rows.map((r) => `
+      tbody.innerHTML = rows.map((r) => {
+        const cf = Array.isArray(r.custom_fields) ? r.custom_fields : [];
+        const cfHtml = cf.length
+          ? '<div class="cf-chips">' + cf.map((f) => `<span class="cf-chip">${esc(f.field_name)}: ${esc(f.field_value)}</span>`).join('') + '</div>'
+          : '<span class="muted">—</span>';
+        return `
         <tr>
           <td data-label="ID">${r.id}</td>
           <td data-label="Имя">${esc(r.first_name)}</td>
@@ -196,15 +213,18 @@
           <td data-label="Пол">${esc(r.gender)}</td>
           <td data-label="Место рождения">${esc(r.birth_place)}</td>
           <td data-label="Гражданство">${esc(r.citizenship)}</td>
+          <td data-label="Адрес">${r.address ? esc(r.address) : '<span class="muted">—</span>'}</td>
           <td data-label="Телефон">${esc(r.phone)}</td>
           <td data-label="Согласие"><span class="tag ${r.consent ? 'tag-yes' : 'tag-no'}">${r.consent ? 'Да' : 'Нет'}</span></td>
+          <td data-label="Доп. данные">${cfHtml}</td>
           <td data-label="Комментарий">${r.admin_comment ? esc(r.admin_comment) : '<span class="muted">—</span>'}</td>
           <td data-label="Зарегистрирован" class="muted">${new Date(r.created_at).toLocaleString('ru-RU')}</td>
           <td class="actions-cell">
             <button class="btn btn-outline btn-sm" data-edit="${r.id}">Изменить</button>
             <button class="btn btn-danger btn-sm" data-del="${r.id}">Удалить</button>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     }
 
     $('#search').addEventListener('input', () => {
@@ -236,6 +256,22 @@
     $('#modalCancel').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
+    // ---- Произвольные поля ----
+    function addCustomFieldRow(name = '', value = '') {
+      const wrap = $('#customFields');
+      const row = document.createElement('div');
+      row.className = 'cf-row';
+      row.innerHTML = `
+        <input type="text" class="cf-name" placeholder="Название (напр. Дети)" />
+        <input type="text" class="cf-value" placeholder="Значение (напр. двое)" />
+        <button type="button" class="cf-del" title="Удалить поле">&times;</button>`;
+      row.querySelector('.cf-name').value = name;
+      row.querySelector('.cf-value').value = value;
+      row.querySelector('.cf-del').addEventListener('click', () => row.remove());
+      wrap.appendChild(row);
+    }
+    $('#addFieldBtn').addEventListener('click', () => addCustomFieldRow());
+
     async function openEdit(id) {
       const res = await fetch('/api/admin/users/' + id);
       if (res.status === 401) return showLogin();
@@ -247,8 +283,12 @@
       f.gender.value = u.gender;
       f.citizenship.value = u.citizenship;
       f.birth_place.value = u.birth_place;
+      f.address.value = u.address || '';
       f.phone.value = u.phone;
       f.admin_comment.value = u.admin_comment || '';
+      // произвольные поля
+      $('#customFields').innerHTML = '';
+      (u.custom_fields || []).forEach((cf) => addCustomFieldRow(cf.field_name, cf.field_value));
       clearMsg($('#modalMsg'));
       modal.classList.add('show');
     }
@@ -256,14 +296,22 @@
     $('#modalSave').addEventListener('click', async () => {
       const f = $('#editForm');
       const id = f.id.value;
+      const custom_fields = Array.from(document.querySelectorAll('#customFields .cf-row'))
+        .map((row) => ({
+          field_name: row.querySelector('.cf-name').value.trim(),
+          field_value: row.querySelector('.cf-value').value.trim()
+        }))
+        .filter((cf) => cf.field_name);
       const body = {
         first_name: f.first_name.value,
         last_name: f.last_name.value,
         gender: f.gender.value,
         birth_place: f.birth_place.value,
         citizenship: f.citizenship.value,
+        address: f.address.value,
         phone: f.phone.value,
-        admin_comment: f.admin_comment.value
+        admin_comment: f.admin_comment.value,
+        custom_fields
       };
       const res = await fetch('/api/admin/users/' + id, {
         method: 'PUT',

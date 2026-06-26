@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import db from './db.js';
+import { sendSms, SMS_DEMO } from './sms.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -43,20 +44,80 @@ function requireAdmin(req, res, next) {
 }
 
 const userPublicColumns =
-  'id, first_name, last_name, gender, birth_place, citizenship, phone, consent, admin_comment, created_at, updated_at';
+  'id, first_name, last_name, gender, birth_place, citizenship, address, phone, consent, admin_comment, created_at, updated_at';
+
+// Возвращает массив произвольных полей пользователя [{id, field_name, field_value}]
+function getCustomFields(userId) {
+  return db
+    .prepare('SELECT id, field_name, field_value FROM user_fields WHERE user_id = ? ORDER BY id')
+    .all(userId);
+}
+
+// Добавляет произвольные поля в объект пользователя
+function withCustomFields(user) {
+  if (!user) return user;
+  return { ...user, custom_fields: getCustomFields(user.id) };
+}
+
+// ---------- SMS-подтверждение телефона ----------
+
+// Запрос кода подтверждения
+app.post('/api/otp/request', async (req, res) => {
+  const normPhone = normalizePhone(req.body && req.body.phone);
+  if (!normPhone) {
+    return res.status(400).json({ error: 'Некорректный номер телефона' });
+  }
+  const exists = db.prepare('SELECT id FROM users WHERE phone = ?').get(normPhone);
+  if (exists) {
+    return res.status(409).json({ error: 'Пользователь с таким номером уже зарегистрирован' });
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000)); // 6 цифр
+  const expiresAt = Date.now() + 5 * 60 * 1000; // 5 минут
+
+  db.prepare(
+    `INSERT INTO otp_codes (phone, code, expires_at, attempts, verified)
+     VALUES (?, ?, ?, 0, 0)
+     ON CONFLICT(phone) DO UPDATE SET code=excluded.code, expires_at=excluded.expires_at, attempts=0, verified=0`
+  ).run(normPhone, code, expiresAt);
+
+  const result = await sendSms(normPhone, `Код подтверждения регистрации: ${code}`);
+  if (!result.ok) {
+    return res.status(502).json({ error: result.error || 'Не удалось отправить SMS' });
+  }
+
+  // В демо-режиме возвращаем код прямо на экран, чтобы можно было продолжить без реальной SMS
+  res.json({ ok: true, demo: SMS_DEMO, ...(SMS_DEMO ? { code } : {}) });
+});
+
+// Проверяет код для телефона. Возвращает true/false. При успехе помечает verified.
+function verifyOtp(phone, code) {
+  const row = db.prepare('SELECT * FROM otp_codes WHERE phone = ?').get(phone);
+  if (!row) return false;
+  if (Date.now() > row.expires_at) return false;
+  if (row.attempts >= 5) return false;
+  if (String(code).trim() !== row.code) {
+    db.prepare('UPDATE otp_codes SET attempts = attempts + 1 WHERE phone = ?').run(phone);
+    return false;
+  }
+  db.prepare('UPDATE otp_codes SET verified = 1 WHERE phone = ?').run(phone);
+  return true;
+}
 
 // ---------- Публичные API ----------
 
 // Регистрация пользователя
 app.post('/api/register', (req, res) => {
-  const { first_name, last_name, gender, birth_place, citizenship, phone, consent } = req.body || {};
+  const { first_name, last_name, gender, birth_place, citizenship, address, phone, consent, code } =
+    req.body || {};
 
   const fn = (first_name || '').trim();
   const ln = (last_name || '').trim();
   const bp = (birth_place || '').trim();
   const cit = (citizenship || '').trim();
+  const addr = (address || '').trim();
 
-  if (!fn || !ln || !bp || !cit) {
+  if (!fn || !ln || !bp || !cit || !addr) {
     return res.status(400).json({ error: 'Заполните все обязательные поля' });
   }
   if (gender !== 'М' && gender !== 'Ж') {
@@ -75,13 +136,20 @@ app.post('/api/register', (req, res) => {
     return res.status(409).json({ error: 'Пользователь с таким номером уже зарегистрирован' });
   }
 
+  // Проверка кода подтверждения телефона
+  if (!verifyOtp(normPhone, code)) {
+    return res.status(400).json({ error: 'Неверный или просроченный код подтверждения' });
+  }
+
   const now = new Date().toISOString();
   const info = db
     .prepare(
-      `INSERT INTO users (first_name, last_name, gender, birth_place, citizenship, phone, consent, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`
+      `INSERT INTO users (first_name, last_name, gender, birth_place, citizenship, address, phone, consent, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
     )
-    .run(fn, ln, gender, bp, cit, normPhone, now, now);
+    .run(fn, ln, gender, bp, cit, addr, normPhone, now, now);
+
+  db.prepare('DELETE FROM otp_codes WHERE phone = ?').run(normPhone);
 
   req.session.userId = Number(info.lastInsertRowid);
   res.json({ ok: true, id: Number(info.lastInsertRowid) });
@@ -143,20 +211,20 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
       .prepare(
         `SELECT ${userPublicColumns} FROM users
          WHERE first_name LIKE ? OR last_name LIKE ? OR phone LIKE ?
-            OR birth_place LIKE ? OR citizenship LIKE ?
+            OR birth_place LIKE ? OR citizenship LIKE ? OR address LIKE ?
          ORDER BY created_at DESC`
       )
-      .all(like, like, like, like, like);
+      .all(like, like, like, like, like, like);
   } else {
     rows = db.prepare(`SELECT ${userPublicColumns} FROM users ORDER BY created_at DESC`).all();
   }
-  res.json(rows);
+  res.json(rows.map(withCustomFields));
 });
 
 app.get('/api/admin/users/:id', requireAdmin, (req, res) => {
   const user = db.prepare(`SELECT ${userPublicColumns} FROM users WHERE id = ?`).get(Number(req.params.id));
   if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-  res.json(user);
+  res.json(withCustomFields(user));
 });
 
 // Редактирование данных пользователя
@@ -165,12 +233,14 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   const existing = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: 'Пользователь не найден' });
 
-  const { first_name, last_name, gender, birth_place, citizenship, phone, admin_comment } = req.body || {};
+  const { first_name, last_name, gender, birth_place, citizenship, address, phone, admin_comment, custom_fields } =
+    req.body || {};
 
   const fn = (first_name || '').trim();
   const ln = (last_name || '').trim();
   const bp = (birth_place || '').trim();
   const cit = (citizenship || '').trim();
+  const addr = (address || '').trim();
   if (!fn || !ln || !bp || !cit) {
     return res.status(400).json({ error: 'Заполните все обязательные поля' });
   }
@@ -187,12 +257,23 @@ app.put('/api/admin/users/:id', requireAdmin, (req, res) => {
   }
 
   db.prepare(
-    `UPDATE users SET first_name=?, last_name=?, gender=?, birth_place=?, citizenship=?, phone=?, admin_comment=?, updated_at=?
+    `UPDATE users SET first_name=?, last_name=?, gender=?, birth_place=?, citizenship=?, address=?, phone=?, admin_comment=?, updated_at=?
      WHERE id=?`
-  ).run(fn, ln, gender, bp, cit, normPhone, (admin_comment || '').trim(), new Date().toISOString(), id);
+  ).run(fn, ln, gender, bp, cit, addr, normPhone, (admin_comment || '').trim(), new Date().toISOString(), id);
+
+  // Полностью пересохраняем произвольные поля (если переданы)
+  if (Array.isArray(custom_fields)) {
+    db.prepare('DELETE FROM user_fields WHERE user_id = ?').run(id);
+    const ins = db.prepare('INSERT INTO user_fields (user_id, field_name, field_value) VALUES (?, ?, ?)');
+    for (const f of custom_fields) {
+      const name = (f && f.field_name ? String(f.field_name) : '').trim();
+      const value = (f && f.field_value != null ? String(f.field_value) : '').trim();
+      if (name) ins.run(id, name, value);
+    }
+  }
 
   const updated = db.prepare(`SELECT ${userPublicColumns} FROM users WHERE id = ?`).get(id);
-  res.json(updated);
+  res.json(withCustomFields(updated));
 });
 
 // Отдельное сохранение комментария администратора
@@ -219,39 +300,66 @@ app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
 app.get('/api/admin/export', requireAdmin, async (req, res) => {
   const rows = db.prepare(`SELECT ${userPublicColumns} FROM users ORDER BY created_at DESC`).all();
 
+  // Собираем все произвольные поля и определяем набор уникальных названий-столбцов
+  const fieldsByUser = new Map();
+  const dynamicNames = [];
+  const seenNames = new Set();
+  for (const r of rows) {
+    const fields = getCustomFields(r.id);
+    fieldsByUser.set(r.id, fields);
+    for (const f of fields) {
+      if (!seenNames.has(f.field_name)) {
+        seenNames.add(f.field_name);
+        dynamicNames.push(f.field_name);
+      }
+    }
+  }
+
   const wb = new ExcelJS.Workbook();
   wb.creator = 'Единый реестр';
   wb.created = new Date();
   const ws = wb.addWorksheet('Пользователи');
 
-  ws.columns = [
+  const baseColumns = [
     { header: 'ID', key: 'id', width: 8 },
     { header: 'Имя', key: 'first_name', width: 18 },
     { header: 'Фамилия', key: 'last_name', width: 20 },
     { header: 'Пол', key: 'gender', width: 6 },
     { header: 'Место рождения', key: 'birth_place', width: 28 },
     { header: 'Гражданство', key: 'citizenship', width: 20 },
+    { header: 'Адрес проживания', key: 'address', width: 32 },
     { header: 'Телефон', key: 'phone', width: 18 },
     { header: 'Согласие', key: 'consent', width: 10 },
     { header: 'Комментарий администратора', key: 'admin_comment', width: 40 },
-    { header: 'Дата регистрации', key: 'created_at', width: 24 },
-    { header: 'Обновлено', key: 'updated_at', width: 24 }
+    { header: 'Дата регистрации', key: 'created_at', width: 22 },
+    { header: 'Обновлено', key: 'updated_at', width: 22 }
   ];
+  const dynamicColumns = dynamicNames.map((name) => ({
+    header: name,
+    key: 'cf__' + name,
+    width: 22
+  }));
+  ws.columns = [...baseColumns, ...dynamicColumns];
 
   ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
   ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1A3A6B' } };
   ws.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
 
   for (const r of rows) {
-    ws.addRow({
+    const row = {
       ...r,
       consent: r.consent ? 'Да' : 'Нет',
       created_at: new Date(r.created_at).toLocaleString('ru-RU'),
       updated_at: new Date(r.updated_at).toLocaleString('ru-RU')
-    });
+    };
+    for (const f of fieldsByUser.get(r.id) || []) {
+      row['cf__' + f.field_name] = f.field_value;
+    }
+    ws.addRow(row);
   }
 
-  ws.autoFilter = { from: 'A1', to: 'K1' };
+  const lastCol = ws.columnCount;
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: lastCol } };
 
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
