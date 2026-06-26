@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Вход — Единый реестр</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <div class="emblem">ЕР</div>
+      <div class="site-header__titles">
+        <span class="site-header__title">Единый реестр граждан</span>
+        <span class="site-header__subtitle">Информационная система</span>
+      </div>
+      <nav class="site-header__nav">
+        <a href="/">Главная</a>
+        <a href="/register.html">Регистрация</a>
+        <a href="/login.html">Вход</a>
+        <a href="/admin">Администратор</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container narrow">
+    <div class="card">
+      <h1>Вход в личный кабинет</h1>
+      <p class="lead">Введите номер телефона, указанный при регистрации.</p>
+
+      <div id="msg" class="msg"></div>
+
+      <form id="form" novalidate>
+        <div class="form-row">
+          <label>Номер телефона <span class="req">*</span></label>
+          <input type="tel" name="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Войти</button>
+      </form>
+
+      <p class="hint" style="margin-top:16px;">Нет учётной записи? <a href="/register.html">Зарегистрироваться</a></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">© 2026 Единый реестр граждан.</footer>
+
+  <script>
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('submitBtn');
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + (type === 'success' ? 'msg-success' : 'msg-error');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: form.phone.value })
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          showMsg(json.error || 'Ошибка входa', 'error');
+        } else {
+          window.location.href = '/profile.html';
+        }
+      } catch (err) {
+        showMsg('Ошибка соединения с сервером', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

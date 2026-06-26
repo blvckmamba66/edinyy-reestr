@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Регистрация — Единый реестр</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <div class="emblem">ЕР</div>
+      <div class="site-header__titles">
+        <span class="site-header__title">Единый реестр граждан</span>
+        <span class="site-header__subtitle">Информационная система</span>
+      </div>
+      <nav class="site-header__nav">
+        <a href="/">Главная</a>
+        <a href="/register.html">Регистрация</a>
+        <a href="/login.html">Вход</a>
+        <a href="/admin">Администратор</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container narrow">
+    <div class="card">
+      <h1>Регистрация в реестре</h1>
+      <p class="lead">Заполните анкету. Поля, отмеченные <span class="req">*</span>, обязательны.</p>
+
+      <div id="msg" class="msg"></div>
+
+      <form id="form" novalidate>
+        <div class="grid-2">
+          <div class="form-row">
+            <label>Имя <span class="req">*</span></label>
+            <input type="text" name="first_name" autocomplete="given-name" />
+          </div>
+          <div class="form-row">
+            <label>Фамилия <span class="req">*</span></label>
+            <input type="text" name="last_name" autocomplete="family-name" />
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-row">
+            <label>Пол <span class="req">*</span></label>
+            <select name="gender">
+              <option value="">— выберите —</option>
+              <option value="М">Мужской (М)</option>
+              <option value="Ж">Женский (Ж)</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Гражданство <span class="req">*</span></label>
+            <input type="text" name="citizenship" placeholder="например, Российская Федерация" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label>Место рождения <span class="req">*</span></label>
+          <input type="text" name="birth_place" placeholder="город, регион, страна" />
+        </div>
+
+        <div class="form-row">
+          <label>Номер телефона <span class="req">*</span></label>
+          <input type="tel" name="phone" placeholder="+7 (___) ___-__-__" autocomplete="tel" />
+          <div class="hint">Используется для входа в личный кабинет.</div>
+        </div>
+
+        <div class="form-row">
+          <label class="consent">
+            <input type="checkbox" name="consent" />
+            <span>
+              Я даю согласие на предоставление, сбор, хранение и обработку моих
+              персональных данных в соответствии с действующим законодательством
+              о защите персональных данных. <span class="req">*</span>
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" id="submitBtn">Зарегистрироваться</button>
+      </form>
+
+      <p class="hint" style="margin-top:16px;">Уже зарегистрированы? <a href="/login.html">Войти</a></p>
+    </div>
+  </main>
+
+  <footer class="site-footer">© 2026 Единый реестр граждан.</footer>
+
+  <script>
+    const form = document.getElementById('form');
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('submitBtn');
+
+    function showMsg(text, type) {
+      msg.textContent = text;
+      msg.className = 'msg show ' + (type === 'success' ? 'msg-success' : 'msg-error');
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = {
+        first_name: form.first_name.value,
+        last_name: form.last_name.value,
+        gender: form.gender.value,
+        birth_place: form.birth_place.value,
+        citizenship: form.citizenship.value,
+        phone: form.phone.value,
+        consent: form.consent.checked
+      };
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          showMsg(json.error || 'Ошибка регистрации', 'error');
+        } else {
+          showMsg('Регистрация успешно завершена. Перенаправление в личный кабинет…', 'success');
+          setTimeout(() => (window.location.href = '/profile.html'), 1000);
+        }
+      } catch (err) {
+        showMsg('Ошибка соединения с сервером', 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
